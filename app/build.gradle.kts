@@ -127,13 +127,12 @@ dependencies {
   implementation(libs.okhttp)
   implementation(libs.retrofit)
   
-  implementation("com.google.api-client:google-api-client:2.2.0")
-  implementation("com.google.oauth-client:google-oauth-client-jetty:1.34.1")
+
+  // Google Drive API dependencies - using Android-compatible versions
   implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0")
   implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
-  
-  // ✅ REQUIRED for GsonFactory to work with Google Drive API
   implementation("com.google.http-client:google-http-client-gson:1.43.3")
+  implementation("com.google.guava:guava:32.1.3-jre")
 
   // ✅ REPLACED: New maintained FFmpeg Kit library
   implementation("com.arthenica:ffmpeg-kit-full:6.0-2")
