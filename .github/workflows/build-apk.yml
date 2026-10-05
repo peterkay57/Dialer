@@ -86,6 +86,22 @@ jobs:
           fi
           echo "Temporary debug keystore verified."
 
+      - name: Setup Firebase config for CI
+        run: |
+          echo "=== Setting up Firebase Configuration for CI ==="
+          if [ ! -f "app/google-services.json" ]; then
+            echo "google-services.json not found. Using template for CI build..."
+            if [ -f "app/google-services.json.template" ]; then
+              cp app/google-services.json.template app/google-services.json
+              echo "✅ Copied google-services.json.template to google-services.json"
+            else
+              echo "ERROR: google-services.json.template not found!"
+              exit 1
+            fi
+          else
+            echo "✅ google-services.json already exists (from repository)"
+          fi
+
       - name: Build debug APK
         id: build_step
         run: |
@@ -149,7 +165,7 @@ jobs:
           RELEASE_TITLE="Debug APK Build #${{ github.run_number }}"
           TARGET_COMMIT="${{ github.sha }}"
           
-          NOTES=$(cat << 'EOF'
+          NOTES=$(cat << 'NOTES_EOF'
           ### Debug APK Build
 
           This is an automatically generated debug APK.
@@ -161,7 +177,7 @@ jobs:
           > **Note:**
           > - This APK is intended for testing.
           > - This APK is signed only with a temporary debug keystore.
-          EOF
+          NOTES_EOF
           )
           
           gh release create "$RELEASE_TAG" "$ASSET_PATH" \
