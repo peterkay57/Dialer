@@ -62,15 +62,17 @@ jobs:
         with:
           gradle-version: '8.10.2'
           
-      - name: Create temporary debug keystore
+      - name: Create standard Android debug keystore
         run: |
-          echo "=== Temporary Debug Keystore Check ==="
-          if [ -f "./debug.keystore" ]; then
-            echo "debug.keystore already exists in repository root."
-          else
-            echo "Generating temporary debug.keystore using Java 17 keytool..."
+          echo "=== Debug Keystore Setup ==="
+          # The Gradle build now uses the standard ~/.android/debug.keystore
+          # location, so generate it there (the build also auto-creates it as
+          # a fallback if this step is skipped).
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            echo "Generating $HOME/.android/debug.keystore using Java 17 keytool..."
             keytool -genkey -v \
-              -keystore ./debug.keystore \
+              -keystore "$HOME/.android/debug.keystore" \
               -storepass android \
               -alias androiddebugkey \
               -keypass android \
@@ -79,17 +81,23 @@ jobs:
               -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
-          
-          if [ ! -f "./debug.keystore" ]; then
+
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
             echo "ERROR: debug.keystore could not be verified or created!"
             exit 1
           fi
-          echo "Temporary debug keystore verified."
+          echo "Debug keystore verified."
+
+      - name: Create .env for secrets plugin
+        run: |
+          # The secrets-gradle-plugin reads local.properties values from .env.
+          # Create an empty one so CI builds don't fail on a missing file.
+          touch .env
 
       - name: Build debug APK
         id: build_step
         run: |
-          gradle :app:assembleDebug --stacktrace --no-daemon --no-configuration-cache
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
       - name: Verify debug APK output
         if: steps.build_step.outcome == 'success'

@@ -26,14 +26,41 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      // Only wire up the release signing config when a keystore actually
+      // exists (or KEYSTORE_PATH is provided in CI). Otherwise the build
+      // fails with "Keystore file ... not found" even for debug builds.
+      val keystoreFile = System.getenv("KEYSTORE_PATH")?.let { file(it) }
+        ?: file("${rootDir}/my-upload-key.jks").takeIf { it.exists() }
+      if (keystoreFile != null) {
+        storeFile = keystoreFile
+        storePassword = System.getenv("STORE_PASSWORD")
+        keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
+      }
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
+      // Use the standard Android debug keystore (~/.android/debug.keystore).
+      val debugKeystore = file(System.getProperty("user.home") + "/.android/debug.keystore")
+      if (!debugKeystore.exists()) {
+        // Auto-create it (same defaults AGP uses) so local builds and CI
+        // never fail with "Keystore file ... not found".
+        debugKeystore.parentFile?.mkdirs()
+        providers.exec {
+          commandLine(
+            System.getProperty("java.home") + "/bin/keytool",
+            "-genkey", "-v",
+            "-keystore", debugKeystore.absolutePath,
+            "-storepass", "android",
+            "-alias", "androiddebugkey",
+            "-keypass", "android",
+            "-keyalg", "RSA",
+            "-keysize", "2048",
+            "-validity", "10000",
+            "-dname", "CN=Android Debug,O=Android,C=US",
+          )
+        }.result.get()
+      }
+      storeFile = debugKeystore
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
@@ -45,7 +72,13 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      // Fall back to the debug keystore when no release keystore is available,
+      // so `assembleRelease` never fails with a missing-keystore error.
+      signingConfig = if (file("${rootDir}/my-upload-key.jks").exists() || System.getenv("KEYSTORE_PATH") != null) {
+        signingConfigs.getByName("release")
+      } else {
+        signingConfigs.getByName("debugConfig")
+      }
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }
